@@ -1,0 +1,322 @@
+---
+title: "get microsoft data"
+author: "Dillon"
+date: "5/23/2022"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(rio)
+library(janitor)
+library(here)
+library(lubridate)
+library(zoo)
+library(DT)
+```
+
+```{r}
+daily_data <- read_csv(here("data", "daily_avg_by_device.csv"))
+
+list <- read_csv(here("data", "device_list.csv")) %>% 
+  select(msrDeviceNbr, deviceFriendlyName, miscAnnotation)
+
+regulatory_days <- read_csv("regulatory_days.csv") %>% 
+  mutate(week = 1:n()) %>% 
+  mutate(week = as.character(week))
+
+```
+
+```{r}
+check_sensor <- 
+  
+```
+
+```{r}
+datatable(daily_data)
+
+```
+
+```{r}
+co_located_sensors <- 
+  list %>% 
+  filter(miscAnnotation == "EPA Co-Location")
+
+```
+So we have three co-locations 
+1. Village Garage, which is in Alsip 
+2. COM ED, which could be Chicago Lawn / Ashburn 
+3. Springfield Pump, which is Logan Square near school and train tracks 
+
+^ all three of these are 1/6 EPA monitors 
+
+```{r}
+co_located_sensors %>% get_dupes(msrDeviceNbr) 
+
+```
+So three of the nine EPA sensors changed since the first sensors were installed:
+2011: installed first in March, then replaced by another sensor on July 13, but then removed again so no readings made after July 17 
+^ we can remove this sensor from the data 
+2015: Replaced on December 12, 2021, so we'll want the readings from before this 
+2212: Looks like it it wasn't installed until November anyway, then replaced a few times in December 
+```{r}
+# I fucked this up and changed the wrong code block 
+co_locations_daily <- 
+  daily_data %>% 
+  inner_join(co_located_sensors, by = "msrDeviceNbr")
+ 
+```
+
+
+```{r}
+co_locations_regulatory_days <- 
+  co_locations_daily %>% 
+  inner_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  select(week, msrDeviceNbr, reg = avgCalibratedPM25)
+```
+
+```{r}
+co_locations_non_regulatory_days <- 
+  co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(regulatory = mean(avgCalibratedPM25))
+```
+
+```{r}
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  lag()
+```
+
+
+```{r}
+compare <- 
+  co_locations_regulatory_days %>% 
+  inner_join(co_locations_nonregulatory_days, by = "msrDeviceNbr") %>% 
+  mutate(percent_change = 100* ((non_regulatory - regulatory)/regulatory))
+```
+
+```{r}
+intervals <-
+  regulatory_days %>% 
+  transmute(epa_day = date_local) %>% 
+  mutate(from = epa_day - days(5)) %>% 
+  mutate(to = epa_day + days(5)) %>% 
+  arrange(epa_day) %>% 
+  mutate(week = 1:n()) %>% 
+  select(from, to)
+```
+
+
+```{r}
+week_1 <-
+  co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-06-26" & readingDateLocal <= "2021-10-31") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "1") %>% 
+  select(week, everything())
+
+week_2 <-
+  co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-07-04" & readingDateLocal <= "2021-07-14") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "2") %>% 
+  select(week, everything())
+
+week_3 <-
+  co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-07-10" & readingDateLocal <= "2021-07-20") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "3") %>% 
+  select(week, everything())
+
+week_4 <-
+  co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-07-16" & readingDateLocal <= "2021-07-26") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "4") %>% 
+  select(week, everything())
+
+week_5 <-
+  co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-07-22" & readingDateLocal <= "2021-08-01") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "5") %>% 
+  select(week, everything())
+
+week_6 <-
+  co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-07-28" & readingDateLocal <= "2021-08-07") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "6") %>% 
+  select(week, everything())
+
+week_7 <-
+  co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-08-03" & readingDateLocal <= "2021-08-13") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "7") %>% 
+  select(week, everything())
+
+week_8 <-
+  co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-08-09" & readingDateLocal <= "2021-08-19") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "8") %>% 
+  select(week, everything())
+
+week_9 <-
+  co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-08-15" & readingDateLocal <= "2021-08-25") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "9") %>% 
+  select(week, everything())
+
+week_10 <-
+  co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-08-21" & readingDateLocal <= "2021-08-31") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "10") %>% 
+  select(week, everything())
+
+week_11 <- 
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-08-27" & readingDateLocal <= "2021-09-06") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "11") %>% 
+  select(week, everything())
+
+week_12 <- 
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-09-02" & readingDateLocal <= "2021-09-12") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "12") %>% 
+  select(week, everything())
+  
+
+week_13 <- 
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-09-08" & readingDateLocal <= "2021-09-18") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "13") %>% 
+  select(week, everything())
+
+week_14 <- 
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-09-14" & readingDateLocal <= "2021-09-24") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "14") %>% 
+  select(week, everything())
+
+week_15 <- 
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-09-20" & readingDateLocal <= "2021-09-30") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "15") %>% 
+  select(week, everything())
+
+week_16 <- 
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-09-26" & readingDateLocal <= "2021-10-06") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "16") %>% 
+  select(week, everything())
+
+week_17 <- 
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-10-02" & readingDateLocal <= "2021-10-12") %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "17") %>% 
+  select(week, everything())
+
+
+week_18 <- 
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-10-08" & readingDateLocal <= "2021-10-18") %>%
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "18") %>% 
+  select(week, everything())
+
+week_19 <- 
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-10-14" & readingDateLocal <= "2021-10-24") %>%
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "19") %>% 
+  select(week, everything())
+
+week_20 <- 
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-10-20" & readingDateLocal <= "2021-10-30") %>%
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "20") %>% 
+  select(week, everything())
+
+week_21 <- 
+co_locations_daily %>% 
+  anti_join(regulatory_days, by = c("readingDateLocal" = "date_local")) %>% 
+  filter(readingDateLocal >= "2021-10-26" & readingDateLocal <= "2021-11-05") %>%
+  group_by(msrDeviceNbr) %>% 
+  summarize(non_reg_av= mean(avgCalibratedPM25)) %>% 
+  mutate(week = "21") %>% 
+  select(week, everything())
+
+
+```
+
+```{r}
+avg_10d_day = rbind(week_1, week_2, week_3, week_4, week_5, week_6, week_7, week_8, week_9, week_10, week_11, week_12, week_13, week_14, week_15, week_16, week_17, week_18, week_19, week_20, week_21)
+
+```
+
+```{r}
+df <- 
+  avg_10d_day %>% 
+  inner_join(co_locations_regulatory_days, by = c("week", "msrDeviceNbr")) %>% 
+  mutate(diff = 100 * (non_reg_av - reg)/reg) %>% 
+  mutate_all(~replace(., is.na(.), 0)) %>% 
+  group_by(msrDeviceNbr) %>% 
+  summarize(mean(diff))
+  #group_by(msrDeviceNbr) %>% 
+  #(mean(diff))
+```

@@ -1,0 +1,89 @@
+---
+title: "Get EPA Monitor Data"
+author: "Dillon"
+date: "5/19/2022"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(rio)
+library(janitor)
+library(RAQSAPI)
+library(keyring)
+```
+
+
+Links: 
+  Sampling schedule: https://www.epa.gov/amtic/sampling-schedule-calendar
+  EPA documentation: https://aqs.epa.gov/aqsweb/documents/data_api.html#tips
+Package: https://github.com/USEPA/RAQSAPI
+
+```{r}
+#my key is russetmallard48
+#want to see the vignette?   RShowDoc(what="RAQSAPIvignette", type="html", package="RAQSAPI")
+key_set(service = "AQSDatamart",
+                   username = "news.dillonbergin@gmail.com")
+
+
+aqs_credentials(username = "news.dillonbergin@gmail.com",
+                  key = key_get("AQSDatamart",
+                   username = "news.dillonbergin@gmail.com"))
+```
+
+```{r}
+cook_county_monitors <- aqs_monitors_by_county(parameter = "88101",
+bdate = as.Date("20210101",
+format="%Y%m%d"),
+edate = as.Date("20211231",
+format="%Y%m%d"),
+stateFIPS = "17",
+countycode = "031"
+)
+```
+
+```{r}
+chicago_cicero_alsip_monitors <- 
+  cook_county_monitors %>% 
+  filter(city_name %in% c("Chicago","Alsip", "Cicero"))
+
+```
+
+```{r}
+cook_county <- aqs_dailysummary_by_county(parameter = "88101",
+bdate = as.Date("20210701",
+format="%Y%m%d"),
+edate = as.Date("20211031",
+format="%Y%m%d"),
+stateFIPS = "17",
+countycode = "031"
+)
+```
+
+```{r}
+chicago_cicero_alsip_data <- 
+  cook_county %>% 
+  filter(city %in% c("Chicago","Alsip", "Cicero")) %>%
+  select(site_number, local_site_name, site_address, sample_duration, pollutant_standard, observation_percent, validity_indicator, as.Date(date_local, "%Y%m%d"), arithmetic_mean) %>% 
+  filter(pollutant_standard == "PM25 24-hour 2012")
+  
+#What is 24 BLK AVG and what are other fields we may not know about? Is there a data dictionary somewhere? This doesn't happen in our cities, but it may be good to know
+#Do we want PM25 24-hour 2012 as our pollutant standard? 
+
+```
+Names of monitors we want in EPA data
+1. SPRINGFIELD PUMP STATION 
+2. COM ED MAINTENANCE BLDG
+3. VILLAGE GARAGE
+```{r}
+regulatory_dates <- 
+  cook_county %>% 
+  filter(local_site_name %in% c("SPRINGFIELD PUMP STATION", "COM ED MAINTENANCE BLDG", "VILLAGE GARAGE")) %>% 
+  select(site_number, local_site_name, site_address, sample_duration, pollutant_standard, observation_percent, validity_indicator, date_local, arithmetic_mean) %>% 
+  filter(pollutant_standard == "PM25 24-hour 2012") %>% 
+  select(date_local) %>% 
+  distinct()
+
+```
+
+

@@ -1,0 +1,11 @@
+*.csv
+*.db
+data/
+.Rproj.user/
+*Rproj
+.Rhistory
+.DS_Store
+*_cache/
+
+.Rproj.user
+.Rdata

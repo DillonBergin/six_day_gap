@@ -1,0 +1,10 @@
+- get data from one EPA sensor 
+- get data from Microsoft sensors around it 
+- make a few plots 
+1. Time series M/T/W/Th/Fr across time
+
+
+- use other Microsoft sensors as a placebo: do they differ as much on and off days as those next to the EPA monitors?
+
+
+
