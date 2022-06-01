@@ -11,9 +11,22 @@ output:
 
 # Hypothesized Findings 
 
+## We have several findings that show the variability between non-regulatory and regulatory days
 
-Questions for next round of analysis: 
-- How many "high polluting" days fall on regulatory days? I.E. maybe the key we're looking for isn't the difference between all regulatory and non-regulatory days, but whether the heaviest pollution days every actually fall on regulatory days 
+* #### From June to October, regulatory days (on days) have *on average* higher PM2.5 levels than non-regulatory days (off days). This would seem to disprove our hypothesis of the six-day gap, were it not for the following findings.
+
+* #### 11 out of 20 weeks had higher off days than on days. 
+
+* #### 5 out of 7 sensors have slightly higher off days than on days. 
+
+## So what would our next steps be?
+
+1. Take our findings to an expert (Dr.Eric Zou) and work through a more rigorous version of analysis. This will likely mean controlling for covariates like temperature, other PM readings like PM10 or PM1, or the gaseous data (which is not released yet but would open up many doors).
+2. Approach this story with assumption that our results won't be a smoking gun to who is gaming the system, but more likely, an example that EPA's on and off day approach is swiss cheese. The only paper on the six-day gap, "Unwatched Pollution" by Zou, measured differences of a maximum of 6 percent between on and off days. Our **big picture** results will be nuanced. 
+
+**Questions for next round of analysis:**
+
+- How many "high polluting" days fall on regulatory days? Do any of the heaviest pollution days ever actually fall on regulatory days? This could be the closest to a smoking gun finding. 
 
 
 ```{r loading, warning=F, message=F}
@@ -44,7 +57,7 @@ regulatory_days <- read_csv("regulatory_days.csv") %>%
 
 ```
 # What Microsoft sensors are co-located with EPA sensors? 
-Now I want to find the sensors that are co-located with EPA sensors, so I'm going to take my list from the Microsoft API and filter it to only sensors that have a miscAnnotation that reads "EPA Co-Location 
+I want to find the sensors that are co-located with EPA sensors, so I'm going to take my list from the Microsoft API and filter it to only sensors that have a "miscAnnotation" column that reads "EPA Co-Location". 
 ```{r echo=F}
 co_located_sensors <- 
   list %>% 
@@ -63,14 +76,16 @@ datatable(co_located_sensors, filter = 'top', class = 'cell-border stripe order-
                             ))
 ```
 # Which Microsoft sensors should we use in our anlaysis? 
-So we have three co-locations 
-1. Village Garage, which is in Alsip 
-2. COM ED, which could be Chicago Lawn / Ashburn 
-3. Springfield Pump, which is Logan Square near school and train tracks 
+So we have three co-locations I see in the data:  
 
-^ all three of these are 1/6 EPA monitors, according EPA's 2019 Illionois Network Plan 
+* Village Garage, which is in Alsip 
+* COM ED, which could be Chicago Lawn / Ashburn 
+* Springfield Pump, which is Logan Square near school and train tracks 
 
-But it looks like there are some duplicates in terms of actual sensors placed at these sights 
+All three of these are 1/6 EPA monitors, according EPA's 2019 Illionois Network Plan.
+
+We have a problem though: it looks like there are some duplicates and sensors that were later removed. 
+
 ```{r echo=F}
 dupes <- 
   co_located_sensors %>% 
@@ -79,12 +94,12 @@ dupes <-
 datatable(dupes)
 ```
 So three of the nine EPA sensors changed since the first sensors were installed:
-2011: installed first in March, then replaced by another sensor on July 13, but then removed again so no readings made after July 17 --> Didn't make any calibrated readings, can remove
-^ we can remove this sensor from the data 
-2015: Replaced on December 12, 2021, so we'll want the readings from before this, --> Didn't make any calibrated readings, can remove
-2212: Looks like it it wasn't installed until November anyway, then replaced a few times in December 
 
-So let's get rid of 2011, 2015, and 2212. The three readings before 2212 went online officially are very high and likely innacurate 
+- 2011: installed first in March, then replaced by another sensor on July 13, but then removed again so no readings made after July 17. Didn't make any calibrated readings, so will remove it from the data. 
+- 2015: Replaced on December 12, 2021. Again, didn't make any calibrated readings, so I can toss it. 
+- 2212: Looks like it it wasn't installed until November anyway, then replaced a few times in December. The three readings before 2212 went online officially are very high and likely inaccurate. Because those are the only three readings it made during these four months, I'm going to remove it from the data. 
+
+*Let's get rid of 2011, 2015, and 2212.*
 ```{r echo=F, eval=F}
 co_location_dupes_daily <- 
   daily_data %>% 
@@ -94,7 +109,7 @@ co_location_dupes_daily <-
  
 #"2015", "2212"
 ```
-This makes the actual seven sensors we're interested in 
+
 ```{r}
 co_located_sensors <- 
   list %>% 
@@ -104,7 +119,7 @@ co_located_sensors <-
 datatable(co_located_sensors)
 
 ```
-Let's double check that these seven sensors don't included any weird problems 
+Now we have seven actual sensors we're interested in. Let's double check that these seven sensors don't included any weird problems by just checking their overall average. These look about right. 
 ```{r}
 summary_sensors <- 
   co_located_sensors %>%
@@ -116,7 +131,7 @@ datatable(summary_sensors)
   
 ```
 # How do regulatory days compare to non-regulatory days? 
-Now let's compare regulatory to non regulatory days. This is odd, very odd .. Regulatory days are steadily 30-40 percent higher? 
+Now let's compare all regulatory to non-regulatory days on average. The results are odd. Regulatory days seem steadily 30% to 40% higher. 
 ```{r echo=F}
 co_locations_daily <- 
   co_located_sensors %>%
@@ -153,7 +168,11 @@ intervals <-
   mutate(week = 1:n()) %>% 
   select(from, to)
 ```
-I have a feeling we might be under-powering by regulatory days, ie comparing a lot of data to a little data. Maybe a better way to do this would make 11 day cycles around the regulatory days. Because it records every six days, we can compare that day to the average daily reading for the five days before and five days after, instead of all days. This could also help us see if there's weeks or months where trends change. The code below is how I seperated out weeks by the 5 days before and 5 days after a regulation day  
+**I have a feeling we might be under-powering the regulatory days, i.e, comparing a lot of data to a little data.**
+
+Maybe a better way to do this would make 11 day cycles around the regulatory days. Because each sensor records every six days, we can compare that day to the average daily reading for the five days before and five days after.
+
+This could also help us see if there's weeks or months where trends change. The code below is how I seperated out weeks by the five days before and five days after a regulation day.
 ```{r}
 week_1 <-
   co_locations_daily %>% 
@@ -362,7 +381,8 @@ co_locations_daily %>%
 ```
 
 # How do the five days before and after a regulatory day compare to regulation day of that specific week?
-Alright let's see that in action. How do certain weeks across the four month span compare to each other? 
+
+**This shows the variation we were missing by aggregating up. There are a lot of weeks where non-regulatory days are much higher, including "Week Two" in which the average of non-regulatory days were 300% higher than the regulatory day.**
 
 ```{r echo=F}
 non_reg_avg_10_day_week <- rbind(week_1, week_2, week_3, week_4, week_5, week_6, week_7, week_8, week_9, week_10, week_11, week_12, week_13, week_14, week_15, week_16, week_17, week_18, week_19, week_20, week_21) %>% 
@@ -385,7 +405,7 @@ datatable(df_week)
 
 ```
 # Which sensors have higher non-regulatory day readings? 
-Interesting, how do certain sensors across the four month span compare to each other? 
+Instead of just looking at weeks across all sensors, let's also take a look at the sensors themselves in aggregate. **This shows that there is less difference at the sensor level than there is at the day level. Some sensors have slightly higher PM on non-regulatory days than on regulatory days.**
 ```{r echo=F}
 
 non_reg_avg_10_day_sensor <- rbind(week_1, week_2, week_3, week_4, week_5, week_6, week_7, week_8, week_9, week_10, week_11, week_12, week_13, week_14, week_15, week_16, week_17, week_18, week_19, week_20, week_21) %>% 
@@ -408,9 +428,9 @@ df_sensor <-
 datatable(df_sensor)
 
 ```
-#Let's check out two things. The worst week was (inline code) and the worst sensor was (inline code)
-- week 2 
-- sensor 2144 
+## What does the sensor with the biggest gap look like across time? 
+
+Sensor 2144 of EPA Village Garage D shows trends that are much different than that location's other sensors, which is likely a calibration problem. 
 
 ```{r echo=F}
 non_reg_avg_10_day_week_2144 <- rbind(week_1, week_2, week_3, week_4, week_5, week_6, week_7, week_8, week_9, week_10, week_11, week_12, week_13, week_14, week_15, week_16, week_17, week_18, week_19, week_20, week_21) %>% 
@@ -433,7 +453,9 @@ df_week_2144 <-
 
 datatable(df_week_2144)
 ```
-#What was going on in week 2? 
+## What was going on in Week 2? 
+
+All EPA sensors were almost double the regulatory day in Week 2. This could be for "gaming the system" reasons, but it could also be due to meteorlogical phenomena like a big change in temperature or wind on that day.
 ```{r echo=F}
 non_reg_avg_10_day_week_2 <- rbind(week_1, week_2, week_3, week_4, week_5, week_6, week_7, week_8, week_9, week_10, week_11, week_12, week_13, week_14, week_15, week_16, week_17, week_18, week_19, week_20, week_21) %>% 
   filter(week == "2") %>% 
